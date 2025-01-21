@@ -50,7 +50,7 @@ base= merge(despesa_ind, post_stratification_df)
 
 
 
-# Creating the annual transportation and gasoline expenditure and the annual family income. 
+# Creating the annual transportation and gasoline expenditure and the annual household income. 
 base <- base %>%
   filter(v9001 %in% c(2300801,2300701,2302301,2302302,2300101,2300201,2300301,
                       2300401,2300402,2300403,2300403,2300404,2300502,2303101,
@@ -65,7 +65,7 @@ base <- base %>%
                               renda_total*12,
                               renda_total*12*deflator))
 
-# Adding up the total transportation and fuel expenses and creating an ID that identifies families:
+# Adding up the total transportation and fuel expenses and creating an ID that identifies households:
 
 base=base %>% 
   group_by(DomicilioID) %>% 
@@ -108,7 +108,7 @@ mediana_total=svyquantile(~base_familia$gasto_total, desenho_amostral, quantiles
 desenho_amostral$variables$Total = 1
 tot_fam_geral=svytotal(~ Total, desenho_amostral)
 
-# Families with expenses lower than the M/2
+# Households with expenses lower than the M/2
 base_familia_abaixo = base_familia %>%  
   filter(gasto_total < (mediana_total[["base_familia$gasto_total"]][1]/2))
 base_familia_abaixo = merge(base_familia_abaixo, post_stratification_df)
@@ -165,7 +165,7 @@ desenho_amostral1 <-
 desenho_amostral1$variables$Total = 1
 tot_fam1=svytotal(~Total, desenho_amostral1)
 
-# Families with expenses lower than the M/2
+# Households with expenses lower than the M/2
 base_d1 = base_d1 %>%  
   filter(gasto_total < (mediana_total[["base_familia$gasto_total"]][1]/2)) 
 
@@ -222,7 +222,7 @@ desenho_amostral1 <-
 desenho_amostral1$variables$Total = 1
 tot_fam2=svytotal(~Total, desenho_amostral1)
 
-# Families with expenses lower than the M/2
+# Households with expenses lower than the M/2
 base_d1 = base_d1 %>%  
   filter(gasto_total < (mediana_total[["base_familia$gasto_total"]][1]/2)) 
 
@@ -279,7 +279,7 @@ desenho_amostral1 <-
 desenho_amostral1$variables$Total = 1
 tot_fam3=svytotal(~Total, desenho_amostral1)
 
-# Families with expenses lower than the M/2
+# Households with expenses lower than the M/2
 base_d1 = base_d1 %>%  
   filter(gasto_total < (mediana_total[["base_familia$gasto_total"]][1]/2)) 
 
@@ -336,7 +336,7 @@ desenho_amostral1 <-
 desenho_amostral1$variables$Total = 1
 tot_fam4=svytotal(~Total, desenho_amostral1)
 
-# Families with expenses lower than the M/2
+# Households with expenses lower than the M/2
 base_d1 = base_d1 %>%  
   filter(gasto_total < (mediana_total[["base_familia$gasto_total"]][1]/2)) 
 
@@ -392,7 +392,7 @@ desenho_amostral1 <-
 desenho_amostral1$variables$Total = 1
 tot_fam5=svytotal(~Total, desenho_amostral1)
 
-# Families with expenses lower than the M/2
+# Households with expenses lower than the M/2
 base_d1 = base_d1 %>%  
   filter(gasto_total < (mediana_total[["base_familia$gasto_total"]][1]/2)) 
 
@@ -448,7 +448,7 @@ desenho_amostral1 <-
 desenho_amostral1$variables$Total = 1
 tot_fam6=svytotal(~Total, desenho_amostral1)
 
-# Families with expenses lower than the M/2
+# Households with expenses lower than the M/2
 base_d1 = base_d1 %>%  
   filter(gasto_total < (mediana_total[["base_familia$gasto_total"]][1]/2)) 
 
@@ -503,7 +503,7 @@ desenho_amostral1 <-
 desenho_amostral1$variables$Total = 1
 tot_fam7=svytotal(~Total, desenho_amostral1)
 
-# Families with expenses lower than the M/2
+# Households with expenses lower than the M/2
 base_d1 = base_d1 %>%  
   filter(gasto_total < (mediana_total[["base_familia$gasto_total"]][1]/2)) 
 
@@ -558,7 +558,7 @@ desenho_amostral1 <-
 desenho_amostral1$variables$Total = 1
 tot_fam8=svytotal(~Total, desenho_amostral1)
 
-# Families with expenses lower than the M/2
+# Households with expenses lower than the M/2
 base_d1 = base_d1 %>%  
   filter(gasto_total < (mediana_total[["base_familia$gasto_total"]][1]/2)) 
 
@@ -613,7 +613,7 @@ desenho_amostral1 <-
 desenho_amostral1$variables$Total = 1
 tot_fam9=svytotal(~Total, desenho_amostral1)
 
-# Families with expenses lower than the M/2
+# Households with expenses lower than the M/2
 base_d1 = base_d1 %>%  
   filter(gasto_total < (mediana_total[["base_familia$gasto_total"]][1]/2)) 
 
@@ -669,7 +669,7 @@ desenho_amostral1 <-
 desenho_amostral1$variables$Total = 1
 tot_fam10=svytotal(~Total, desenho_amostral1)
 
-# Families with expenses lower than the M/2
+# Households with expenses lower than the M/2
 base_d1 = base_d1 %>%  
   filter(gasto_total < (mediana_total[["base_familia$gasto_total"]][1]/2)) 
 
@@ -708,7 +708,7 @@ ext_total_d10=svytotal(~base_mediana$valor_total, desenho_amostral1)
 ### Saving:
 
 
-# family size in decile
+# Household size in decile
 
 tot_fam_decil=c(tot_fam1[1],
                 tot_fam2[1],
@@ -722,7 +722,7 @@ tot_fam_decil=c(tot_fam1[1],
                 tot_fam10[1], 
                 tot_fam_geral[1])
 
-# Number of families below the median
+# Number of Households below the median
 
 tot_fam_abaixo_decil=c(tot_fam_med1[1],
                        tot_fam_med2[1],
