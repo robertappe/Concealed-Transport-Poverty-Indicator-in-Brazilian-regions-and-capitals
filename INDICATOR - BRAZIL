@@ -96,7 +96,7 @@ mediana_total=svyquantile(~base_familia$gasto_total, desenho_amostral, quantiles
 desenho_amostral$variables$Total = 1
 tot_fam_geral=svytotal(~ Total, desenho_amostral)
 
-# Families with expenses lower than the M/2
+# Households with expenses lower than the M/2
 
 base_familia_abaixo = base_familia %>%  
   filter(gasto_total < (mediana_total[["base_familia$gasto_total"]][1]/2))
@@ -154,7 +154,7 @@ desenho_amostral1 <-
 desenho_amostral1$variables$Total = 1
 tot_fam1=svytotal(~Total, desenho_amostral1)
 
-# Families with expenses lower than the M/2
+# Households with expenses lower than the M/2
 
 base_d1 = base_d1 %>%  
   filter(gasto_total < (mediana_total[["base_familia$gasto_total"]][1]/2)) 
@@ -212,7 +212,7 @@ desenho_amostral1 <-
 desenho_amostral1$variables$Total = 1
 tot_fam2=svytotal(~Total, desenho_amostral1)
 
-# Families with expenses lower than the M/2
+# Households with expenses lower than the M/2
 
 base_d1 = base_d1 %>%  
   filter(gasto_total < (mediana_total[["base_familia$gasto_total"]][1]/2)) 
@@ -270,7 +270,7 @@ desenho_amostral1 <-
 desenho_amostral1$variables$Total = 1
 tot_fam3=svytotal(~Total, desenho_amostral1)
 
-# Families with expenses lower than the M/2
+# Households with expenses lower than the M/2
 
 base_d1 = base_d1 %>%  
   filter(gasto_total < (mediana_total[["base_familia$gasto_total"]][1]/2)) 
@@ -328,7 +328,7 @@ desenho_amostral1 <-
 desenho_amostral1$variables$Total = 1
 tot_fam4=svytotal(~Total, desenho_amostral1)
 
-# Families with expenses lower than the M/2
+# Households with expenses lower than the M/2
 base_d1 = base_d1 %>%  
   filter(gasto_total < (mediana_total[["base_familia$gasto_total"]][1]/2)) 
 
@@ -384,7 +384,7 @@ desenho_amostral1 <-
 desenho_amostral1$variables$Total = 1
 tot_fam5=svytotal(~Total, desenho_amostral1)
 
-# Families with expenses lower than the M/2
+# Households with expenses lower than the M/2
 base_d1 = base_d1 %>%  
   filter(gasto_total < (mediana_total[["base_familia$gasto_total"]][1]/2)) 
 
@@ -440,7 +440,7 @@ desenho_amostral1 <-
 desenho_amostral1$variables$Total = 1
 tot_fam6=svytotal(~Total, desenho_amostral1)
 
-# Families with expenses lower than the M/2
+# Households with expenses lower than the M/2
 base_d1 = base_d1 %>%  
   filter(gasto_total < (mediana_total[["base_familia$gasto_total"]][1]/2)) 
 
@@ -495,7 +495,7 @@ desenho_amostral1 <-
 desenho_amostral1$variables$Total = 1
 tot_fam7=svytotal(~Total, desenho_amostral1)
 
-# Families with expenses lower than the M/2
+# Households with expenses lower than the M/2
 base_d1 = base_d1 %>%  
   filter(gasto_total < (mediana_total[["base_familia$gasto_total"]][1]/2)) 
 
@@ -550,7 +550,7 @@ desenho_amostral1 <-
 desenho_amostral1$variables$Total = 1
 tot_fam8=svytotal(~Total, desenho_amostral1)
 
-# Families with expenses lower than the M/2
+# Households with expenses lower than the M/2
 base_d1 = base_d1 %>%  
   filter(gasto_total < (mediana_total[["base_familia$gasto_total"]][1]/2)) 
 
@@ -605,7 +605,7 @@ desenho_amostral1 <-
 desenho_amostral1$variables$Total = 1
 tot_fam9=svytotal(~Total, desenho_amostral1)
 
-# Families with expenses lower than the M/2
+# Households with expenses lower than the M/2
 base_d1 = base_d1 %>%  
   filter(gasto_total < (mediana_total[["base_familia$gasto_total"]][1]/2)) 
 
@@ -661,7 +661,7 @@ desenho_amostral1 <-
 desenho_amostral1$variables$Total = 1
 tot_fam10=svytotal(~Total, desenho_amostral1)
 
-# Families with expenses lower than the M/2
+# Households with expenses lower than the M/2
 base_d1 = base_d1 %>%  
   filter(gasto_total < (mediana_total[["base_familia$gasto_total"]][1]/2)) 
 
@@ -700,7 +700,7 @@ ext_total_d10=svytotal(~base_mediana$valor_total, desenho_amostral1)
 ### Saving:
 
 
-# family size in the saying:
+# Household size in the saying:
 
 tot_fam_decil=c(tot_fam1[1],
                 tot_fam2[1],
@@ -714,7 +714,7 @@ tot_fam_decil=c(tot_fam1[1],
                 tot_fam10[1], 
                 tot_fam_geral[1])
 
-# Family quantity below the median
+# Household quantity below the median
 
 tot_fam_abaixo_decil=c(tot_fam_med1[1],
                        tot_fam_med2[1],
