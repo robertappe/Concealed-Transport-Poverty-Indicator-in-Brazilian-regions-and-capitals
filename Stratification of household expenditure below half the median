@@ -1,0 +1,112 @@
+# Loading necessary libraries
+library("tidyverse")
+library("Hmisc")
+library("weights")
+library("survey")
+library("writexl")
+
+# Setting the working directory
+setwd("C:/Users/55219/Meu Drive/DOUTORADO PPE UFRJ/PAPER 2/R - ANALISE GASTOS/Análise de Gastos Abaixo M-2")
+
+# Loading the data
+load(file = "Despesa_Individual.RData")
+load(file = "Estratos_peso.RData")
+
+### Adjusting and creating person and household ID: expense dataset
+despesa_ind <- despesa_ind %>%
+  mutate(
+    cod_upa = as.character(cod_upa),
+    estrato_pof = as.character(estrato_pof),
+    tipo_situacao_reg = as.character(tipo_situacao_reg),
+    num_dom = as.character(num_dom),
+    num_uc = as.character(num_uc),
+    cod_informante = as.character(cod_informante),
+    DomicilioID = paste0(cod_upa, num_dom, num_uc)
+  ) %>%
+  select(DomicilioID, estrato_pof, cod_upa, renda_total, uf, deflator, peso, v9001, v9011, v8000_defla, fator_anualizacao, tipo_situacao_reg)
+
+# Creating annual spending on transportation and gasoline and the family's annual income
+base <- despesa_ind %>%
+  filter(v9001 %in% c(
+    2300801, 2300701, 2302301, 2302302, 2300101, 2300201, 2300301, 2300401,
+    2300402, 2300403, 2300404, 2300502, 2303101, 2303102, 2303201, 2300601,
+    2300602, 2300409, 2300901, 2300902, 2300903, 2300904, 2300906, 2300907,
+    2300908, 2300911, 2301101, 2301201, 2301301, 2302801, 2302901, 2303001,
+    2301401, 2301501, 2301502, 2301601, 2301801
+  )) %>%
+  mutate(
+    gasto_transporte_pub = ifelse(is.na(v9011), v8000_defla * fator_anualizacao, v8000_defla * fator_anualizacao * v9011),
+    renda_anual = ifelse(is.na(deflator), renda_total * 12, renda_total * 12 * deflator)
+  )
+
+# Summing total transportation and fuel expenses and creating an ID to identify families
+base <- base %>%
+  group_by(DomicilioID) %>%
+  mutate(gasto_total = sum(gasto_transporte_pub, na.rm = TRUE)) %>%
+  ungroup() %>%
+  distinct(DomicilioID, .keep_all = TRUE)
+
+# Defining the sample design correctly
+desenho_amostral <- svydesign(ids = ~1, data = base, weights = ~peso)
+
+# Calculating income deciles
+decis <- svyquantile(~renda_anual, desenho_amostral, quantiles = seq(0.1, 1, by = 0.1))
+
+# Calculating the median of total expenses
+mediana_regiao <- svyquantile(~gasto_total, desenho_amostral, quantiles = 0.5)$gasto_total[1]
+
+# Filtering families with total expenses below half of the median
+base <- base %>% filter(gasto_total < (mediana_regiao / 2))
+
+# Extracting quantile values (9 deciles for 10 intervals)
+decis_valores <- decis$renda_anual[1:10, 1]
+
+# Defining the 8 expense groups
+filtros_grupos <- list(
+  "1" = c(2301401, 2301501, 2301502, 2301601, 2301801),
+  "2" = c(2300801),
+  "3" = c(2300701),
+  "4" = c(2302301, 2302302),
+  "5" = c(2300101, 2300201, 2300301),
+  "6" = c(2300401, 2300402, 2300403, 2300502, 2303101, 2303102, 2303201, 2300601, 2300602, 2300409),
+  "7" = c(2300901, 2300902, 2300903, 2300904, 2300906, 2300907, 2300908, 2300911),
+  "8" = c(2301101, 2301201, 2301301, 2302801, 2302901, 2303001)
+)
+
+# Choosing a group
+grupo_escolhido <- "8"
+base_filtrada <- base %>% filter(v9001 %in% filtros_grupos[[grupo_escolhido]])
+
+# Defining intervals correctly, using the 9 quantile values
+base_filtrada <- base_filtrada %>% mutate(decil = cut(renda_anual, breaks = c(-Inf, decis_valores), labels = 1:10, right = FALSE))
+
+# Urban/Rural filter
+base_filtrada <- base_filtrada %>% mutate(tipo_situacao_reg = case_when(tipo_situacao_reg == 1 ~ "Urbano", tipo_situacao_reg == 2 ~ "Rural", TRUE ~ NA_character_)) %>% filter(tipo_situacao_reg == "Urbano")
+
+# Creating a region variable
+base_filtrada <- base_filtrada %>% mutate(regiao = case_when(uf >= 11 & uf <= 17 ~ "Norte", uf >= 21 & uf <= 29 ~ "Nordeste", uf >= 31 & uf <= 35 ~ "Sudeste", uf >= 41 & uf <= 43 ~ "Sul", uf >= 50 & uf <= 53 ~ "Centro-Oeste", TRUE ~ NA_character_))
+
+# Adjusting the configuration to handle strata with only one PSU
+options(survey.lonely.psu = "adjust")
+
+# Defining the sample design for the filtered dataset
+desenho_amostral_filtrado <- svydesign(id = ~cod_upa, strata = ~estrato_pof, weights = ~peso, data = base_filtrada, nest = TRUE)
+
+# Function to calculate total expenses per group
+calcular_gasto <- function(filtro) {
+  if (nrow(filtro) > 0) {
+    desenho <- svydesign(id = ~cod_upa, strata = ~estrato_pof, weights = ~peso, data = filtro, nest = TRUE)
+    return(as.numeric(svytotal(~gasto_total, desenho)[1]))
+  }
+  return(NA)
+}
+
+# Calculating total spending for Brazil
+gasto_total_brasil <- calcular_gasto(base_filtrada)
+
+# Exporting to Excel
+nome_arquivo <- paste0("abaixom2resultado_gastosurbano_grupo_", grupo_escolhido, ".xlsx")
+write_xlsx(resultado_gastos, nome_arquivo)
+
+# Displaying the result for verification
+print(resultado_gastos)
