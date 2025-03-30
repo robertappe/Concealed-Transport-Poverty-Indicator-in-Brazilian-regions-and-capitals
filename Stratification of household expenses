@@ -1,0 +1,116 @@
+# Loading necessary libraries
+library(tidyverse)
+library(Hmisc)
+library(weights)
+library(survey)
+library(writexl)
+options(survey.lonely.psu = "adjust")
+
+# Set working directory
+setwd("C:/Users/55219/Meu Drive/DOUTORADO PPE UFRJ/PAPER 2/R - ANALISE GASTOS")
+
+# Load datasets
+load(file = "Despesa_Individual.RData")
+load(file = "Estratos_peso.RData")
+
+# Create household ID
+despesa_ind <- despesa_ind %>%
+  mutate(DomicilioID = paste0(as.character(cod_upa), as.character(num_dom), as.character(num_uc)))
+
+# Select relevant columns
+despesa_ind <- despesa_ind %>%
+  select(DomicilioID, estrato_pof, cod_upa, renda_total, uf, deflator, peso, v9001, v9011, v8000_defla, fator_anualizacao, tipo_situacao_reg)
+
+# Manually calculate income deciles
+despesa_ind <- despesa_ind %>%
+  mutate(renda_anual = ifelse(is.na(deflator), renda_total * 12, renda_total * 12 * deflator))
+
+decis_manual <- quantile(despesa_ind$renda_anual, probs = seq(0.1, 1, by = 0.1), na.rm = TRUE)
+breaks_unicos <- unique(c(-Inf, decis_manual))
+labels_decil <- paste0(1:10, "º Decil")
+
+despesa_ind <- despesa_ind %>%
+  mutate(decil = cut(renda_anual, breaks = breaks_unicos, labels = labels_decil, include.lowest = TRUE))
+
+# Define expense group filters
+filtros_grupos <- list(
+  "1" = c(2301401, 2301501, 2301502, 2301601, 2301801),
+  "2" = c(2300801),
+  "3" = c(2300701),
+  "4" = c(2302301, 2302302),
+  "5" = c(2300101, 2300201, 2300301),
+  "6" = c(2300401, 2300402, 2300403, 2300502, 2303101, 2303102, 2303201, 2300601, 2300602, 2300409),
+  "7" = c(2300901, 2300902, 2300903, 2300904, 2300906, 2300907, 2300908, 2300911),
+  "8" = c(2301101, 2301201, 2301301, 2302801, 2302901, 2303001),
+  "9" = c(2301401, 2301501, 2301502, 2301601, 2301801, 2300801, 2300701, 2302301, 2302302, 2300101, 2300201, 2300301,
+          2300401, 2300402, 2300403, 2300502, 2303101, 2303102, 2303201, 2300601, 2300602, 2300409, 2300901, 2300902,
+          2300903, 2300904, 2300906, 2300907, 2300908, 2300911, 2301101, 2301201, 2301301, 2302801, 2302901, 2303001)
+)
+
+# Select expense group
+grupo_escolhido <- "8"
+
+# Filter dataset by group and calculate expenses
+base <- despesa_ind %>%
+  filter(v9001 %in% filtros_grupos[[grupo_escolhido]]) %>%
+  mutate(gasto_transporte_pub = ifelse(is.na(v9011), v8000_defla * fator_anualizacao, v8000_defla * fator_anualizacao * v9011)) %>%
+  group_by(DomicilioID) %>%
+  mutate(gasto_total = sum(gasto_transporte_pub, na.rm = TRUE)) %>%
+  ungroup() %>%
+  distinct(DomicilioID, .keep_all = TRUE)
+
+# FILTER URBAN/RURAL
+base <- base %>%
+  mutate(
+    tipo_situacao_reg = case_when(
+      tipo_situacao_reg == 1 ~ "Urban",  # If 1, it's "Urban"
+      tipo_situacao_reg == 2 ~ "Rural",  # If 2, it's "Rural"
+      TRUE ~ NA_character_                # Otherwise, assign NA
+    )
+  ) %>%
+  filter(tipo_situacao_reg == "Rural")  # Keep only "Rural" data
+
+# Create region variable
+base <- base %>%
+  mutate(regiao = case_when(
+    uf >= 11 & uf <= 17 ~ "North", 
+    uf >= 21 & uf <= 29 ~ "Northeast",
+    uf >= 31 & uf <= 35 ~ "Southeast",
+    uf >= 41 & uf <= 43 ~ "South",
+    uf >= 50 & uf <= 53 ~ "Central-West", 
+    TRUE ~ NA
+  ))
+
+# Define survey design
+desenho_amostral <- svydesign(
+  id = ~cod_upa, 
+  strata = ~estrato_pof, 
+  weights = ~peso, 
+  data = base, 
+  nest = TRUE
+)
+
+# Calculate total expenses
+calcular_gasto <- function(filtro) {
+  if (nrow(filtro) > 0) {
+    desenho <- svydesign(id = ~cod_upa, strata = ~estrato_pof, weights = ~peso, data = filtro, nest = TRUE)
+    return(as.numeric(svytotal(~gasto_total, desenho)[1]))
+  }
+  return(NA)
+}
+
+gasto_total_brasil <- calcular_gasto(base)
+
+gasto_por_decil <- sapply(labels_decil, function(d) calcular_gasto(base %>% filter(decil == d)))
+
+gasto_por_regiao <- base %>% group_by(regiao) %>% summarise(Gasto = calcular_gasto(cur_data()))
+
+gasto_por_decil_regiao <- base %>% group_by(decil, regiao) %>% summarise(Gasto = calcular_gasto(cur_data()), .groups = "drop") %>%
+  pivot_wider(names_from = regiao, values_from = Gasto)
+
+# Create final data frame
+resultado_gastos <- data.frame(Tipo = c("Total Brazil", labels_decil), Gasto = c(gasto_total_brasil, gasto_por_decil))
+resultado_gastos <- left_join(resultado_gastos, gasto_por_decil_regiao, by = c("Tipo" = "decil"))
+
+# Export to Excel
+write_xlsx(resultado_gastos, path = paste0("Regions_Rural_group_", grupo_escolhido, ".xlsx"))
