@@ -1,1 +1,106 @@
+library(tidyverse)
+library(Hmisc)
+library(weights)
+library(survey)
+library(writexl)
+options(survey.lonely.psu = "adjust")
+
+# Set the directory
+setwd("C:/Users/55219/Meu Drive/DOUTORADO PPE UFRJ/PAPER 2/R - ANALISE GASTOS/Domicilios")
+
+# Load datasets
+load(file = "Despesa_Individual.RData")
+load(file = "Estratos_peso.RData")
+
+# Create household ID
+despesa_ind <- despesa_ind %>%
+  mutate(DomicilioID = paste0(as.character(cod_upa), as.character(num_dom), as.character(num_uc)))
+
+# Select relevant columns
+despesa_ind <- despesa_ind %>%
+  select(DomicilioID, estrato_pof, cod_upa, renda_total, uf, deflator, peso, v9001, v9011, v8000_defla, fator_anualizacao, tipo_situacao_reg)
+
+# Manually calculate deciles
+despesa_ind <- despesa_ind %>%
+  mutate(renda_anual = ifelse(is.na(deflator), renda_total * 12, renda_total * 12 * deflator))
+
+decis_manual <- quantile(despesa_ind$renda_anual, probs = seq(0.1, 1, by = 0.1), na.rm = TRUE)
+unique_breaks <- unique(c(-Inf, decis_manual))
+decil_labels <- paste0(1:10, "th Decile")
+
+despesa_ind <- despesa_ind %>%
+  mutate(decil = cut(renda_anual, breaks = unique_breaks, labels = decil_labels, include.lowest = TRUE))
+
+# Define group filters
+group_filters <- list(
+  "1" = c(2301401, 2301501, 2301502, 2301601, 2301801),
+  "2" = c(2300801),
+  "3" = c(2300701),
+  "4" = c(2302301, 2302302),
+  "5" = c(2300101, 2300201, 2300301),
+  "6" = c(2300401, 2300402, 2300403, 2300502, 2303101, 2303102, 2303201, 2300601, 2300602, 2300409),
+  "7" = c(2300901, 2300902, 2300903, 2300904, 2300906, 2300907, 2300908, 2300911),
+  "8" = c(2301101, 2301201, 2301301, 2302801, 2302901, 2303001),
+  "9" = c(2301401, 2301501, 2301502, 2301601, 2301801, 2300801, 2300701, 2302301, 2302302, 2300101, 2300201, 2300301,
+          2300401, 2300402, 2300403, 2300502, 2303101, 2303102, 2303201, 2300601, 2300602, 2300409, 2300901, 2300902,
+          2300903, 2300904, 2300906, 2300907, 2300908, 2300911, 2301101, 2301201, 2301301, 2302801, 2302901, 2303001)
+)
+
+# Choose group
+selected_group <- "9"
+
+# Filter dataset by group and calculate transport expenditure
+base <- despesa_ind %>%
+  filter(v9001 %in% group_filters[[selected_group]]) %>%
+  mutate(public_transport_exp = ifelse(is.na(v9011), v8000_defla * fator_anualizacao, v8000_defla * fator_anualizacao * v9011)) %>%
+  group_by(DomicilioID) %>%
+  mutate(total_expense = sum(public_transport_exp, na.rm = TRUE)) %>%
+  ungroup() %>%
+  distinct(DomicilioID, .keep_all = TRUE)
+
+# Create survey design
+survey_design <- svydesign(
+  id = ~cod_upa, 
+  strata = ~estrato_pof, 
+  weights = ~peso, 
+  data = base, 
+  nest = TRUE
+)
+
+# Calculate the number of HOUSEHOLDS in each decile
+household_count <- despesa_ind %>%
+  group_by(decil) %>%
+  summarise(num_households = n_distinct(DomicilioID), .groups = "drop")
+
+# Calculate the total number of families
+total_families <- n_distinct(despesa_ind$DomicilioID)
+
+# Export the results to an Excel file
+results <- list(
+  "Household Count by Decile" = household_count,
+  "Total Families" = data.frame(Total_Families = total_families)
+)
+
+# Save to an Excel file
+write_xlsx(results, "FAMILIASTOTAL.xlsx")
+
+# Calculate the number of households in each decile in the filtered base
+household_count <- base %>%
+  group_by(decil) %>%
+  summarise(num_households = n_distinct(DomicilioID), .groups = "drop")
+
+# Calculate the total number of families in the filtered base
+total_families <- n_distinct(base$DomicilioID)
+
+# Create a data frame with the total number of families
+total_families_df <- data.frame(Total_Families = total_families)
+
+# Export the results to an Excel file
+results <- list(
+  "Household Count by Decile" = household_count,
+  "Total Families" = total_families_df
+)
+
+# Save to an Excel file
+write_xlsx(results, "FAMILIASCOMGASTOS.xlsx")
 
