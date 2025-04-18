@@ -1,0 +1,119 @@
+# Loading the necessary libraries
+library("tidyverse")
+library("Hmisc")
+library("weights")
+library("survey")
+library("writexl")
+
+# Setting the working directory
+setwd("C:/Users/55219/Meu Drive/DOUTORADO PPE UFRJ/PAPER 2/R - ANALISE GASTOS/Domicilios")
+
+# Loading the data
+load(file = "Despesa_Individual.RData")
+load(file = "Estratos_peso.RData")
+
+### Fixing and creating person and household ID: expenditure dataset
+despesa_ind$cod_upa <- as.character(despesa_ind$cod_upa)
+despesa_ind$estrato_pof <- as.character(despesa_ind$estrato_pof)
+despesa_ind$tipo_situacao_reg <- as.character(despesa_ind$tipo_situacao_reg)
+despesa_ind$num_dom <- as.character(despesa_ind$num_dom)
+despesa_ind$num_uc <- as.character(despesa_ind$num_uc)
+despesa_ind$cod_informante <- as.character(despesa_ind$cod_informante)
+
+despesa_ind <- despesa_ind %>%
+  dplyr::mutate(DomicilioID = paste0(cod_upa, num_dom, num_uc, sep = ""))
+
+despesa_ind <- despesa_ind %>% 
+  select(DomicilioID, estrato_pof, cod_upa, renda_total, uf, deflator, peso, v9001, v9011, v8000_defla, fator_anualizacao, tipo_situacao_reg)
+
+# Creating annual expenditure on transport and fuel, and the annual household income
+base <- despesa_ind %>%
+  filter(v9001 %in% c(2300801, 2300701, 2302301, 2302302, 2300101, 2300201, 2300301,
+                      2300401, 2300402, 2300403, 2300403, 2300404, 2300502, 2303101,
+                      2303102, 2303201, 2300601, 2300602, 2300409, 2300901, 2300902,
+                      2300903, 2300904, 2300906, 2300907, 2300908, 2300911, 2301101,
+                      2301201, 2301301, 2302801, 2302901, 2303001, 2301401, 2301501,
+                      2301502, 2301601, 2301801)) %>%
+  mutate(gasto_transporte_pub = ifelse(is.na(v9011), 
+                                       v8000_defla * fator_anualizacao, 
+                                       v8000_defla * fator_anualizacao * v9011),
+         renda_anual = ifelse(is.na(deflator),
+                              renda_total * 12,
+                              renda_total * 12 * deflator))
+
+# Summing the total transport and fuel expenditures and creating a household identifier
+base <- base %>% 
+  group_by(DomicilioID) %>% 
+  mutate(gasto_total = sum(gasto_transporte_pub, rm.na = TRUE)) %>% 
+  ungroup()
+
+# Keeping only the first line of each household in the dataset
+base <- dplyr::distinct(base, DomicilioID, .keep_all = TRUE)
+
+# Correctly defining the sample design
+desenho_amostral <- svydesign(ids = ~1, data = base, weights = ~peso)
+
+# Calculating income deciles
+decis <- svyquantile(~renda_anual, desenho_amostral, quantiles = seq(0.1, 1, by = 0.1))
+
+# Calculating the median total expenditure
+mediana_regiao <- svyquantile(~gasto_total, desenho_amostral, quantiles = 0.5)
+
+# Correctly accessing the median value
+mediana_regiao <- mediana_regiao$gasto_total[1]
+
+# Filtering households with total expenditure below half the median
+base <- base %>%
+  filter(gasto_total < (mediana_regiao / 2))
+
+# Extracting the quantile values (9 deciles for 10 intervals)
+# Taking the 9 quantiles corresponding to the intervals, accessing the first column of the matrix
+decis_valores <- decis$renda_anual[1:10, 1]  # Taking the values of rows 2 to 10 from the first column
+
+# Defining the 8 expenditure groups
+filtros_grupos <- list(
+  "1" = c(2301401, 2301501, 2301502, 2301601, 2301801),
+  "2" = c(2300801),
+  "3" = c(2300701),
+  "4" = c(2302301, 2302302),
+  "5" = c(2300101, 2300201, 2300301),
+  "6" = c(2300401, 2300402, 2300403, 2300502, 2303101, 2303102, 2303201, 2300601, 2300602, 2300409),
+  "7" = c(2300901, 2300902, 2300903, 2300904, 2300906, 2300907, 2300908, 2300911),
+  "8" = c(2301101, 2301201, 2301301, 2302801, 2302901, 2303001),
+  "9" = c(2301401, 2301501, 2301502, 2301601, 2301801, 2300801, 2300701, 2302301, 2302302, 2300101, 2300201, 2300301,
+          2300401, 2300402, 2300403, 2300502, 2303101, 2303102, 2303201, 2300601, 2300602, 2300409, 2300901, 2300902,
+          2300903, 2300904, 2300906, 2300907, 2300908, 2300911, 2301101, 2301201, 2301301, 2302801, 2302901, 2303001)
+)
+
+# Choosing a group
+grupo_escolhido <- "9"
+
+base_filtrada <- base %>%
+  filter(v9001 %in% filtros_grupos[[grupo_escolhido]])
+
+# Correctly defining the intervals, using the 9 quantile values
+base_filtrada <- base_filtrada %>% 
+  mutate(decil = cut(renda_anual,
+                     breaks = c(-Inf, decis_valores),  # Remove "Inf" because we already have 10 intervals
+                     labels = 1:10, 
+                     right = FALSE))  
+
+# Counting the number of households in each decile in the filtered dataset
+contagem_domicilios <- base_filtrada %>%
+  group_by(decil) %>%
+  summarise(num_domicilios = n_distinct(DomicilioID), .groups = "drop")
+
+# Calculating the total number of households in the filtered dataset
+total_familias <- n_distinct(base_filtrada$DomicilioID)
+
+# Creating a data frame with the total number of households
+total_familias_df <- data.frame(Total_Familias = total_familias)
+
+# Exporting the results to an Excel file
+resultados <- list(
+  "Households per Decile" = contagem_domicilios,
+  "Total Households" = total_familias_df
+)
+
+# Saving to an Excel file
+write_xlsx(resultados, "FAMILIASCOMGASTOSABAIXOM2.xlsx")
